@@ -4,3 +4,4 @@ demo-dist/
 public-demo/
 *.log
 .DS_Store
+work/

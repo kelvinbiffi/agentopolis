@@ -10,7 +10,15 @@ export interface AgentDef {
   color: string
   /** Text of its building's sign (e.g. "SOUND STAGE"); defaults to the name in capitals. */
   sign?: string
+  /**
+   * Who plays the agent: `"robot"` (default, tinted in `color`), one of the built-in
+   * characters (see `CHARACTERS`), or the URL of your own rigged `.glb`.
+   */
+  model?: 'robot' | Character | (string & {})
 }
+
+/** The built-in characters, a film crew, each with its own look and animations. */
+export type Character = 'director' | 'narrator' | 'designer' | 'critic' | 'composer' | 'editor' | 'explorer'
 
 /** Optional fixed position of an agent's building on the lot grid (tiles are 2 × 2 units). */
 export interface Placement {
@@ -26,7 +34,7 @@ export type Theme = 'sunset' | 'day' | 'night'
 export interface AgentopolisOptions {
   /** The agents, in the order their buildings line up along the main street. */
   agents: AgentDef[]
-  /** Where `robot.glb` and `city/*.gltf` are served from. Defaults to the jsDelivr copy of this package's assets. */
+  /** Where `robot.glb`, `characters/*.glb` and `city/*.gltf` are served from. Defaults to the jsDelivr copy of this package's assets. */
   assetsUrl?: string
   /** Big letters on the hill. Default "AGENTOPOLIS". */
   title?: string

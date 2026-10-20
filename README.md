@@ -1,6 +1,6 @@
 # Agentopolis
 
-**A tiny 3D city where your AI agents live.** Each agent is a little robot with its own building. The one speaking walks to the crossroads, and the agent it answers comes to meet it there, face to face, with speech bubbles. Quiet agents go for a coffee, sit on a bench or take a stroll. When the work is done, the crew gathers and dances.
+**A tiny 3D city where your AI agents live.** Each agent is a character (a film crew is built in, or bring your own) or a little robot, with its own building. The one speaking walks to the crossroads, and the agent it answers comes to meet it there, face to face, with speech bubbles. Quiet agents go for a coffee, sit on a bench or take a stroll. When the work is done, the crew gathers and dances.
 
 Feed it events from any multi-agent system (LangGraph, CrewAI, AutoGen, the OpenAI Agents SDK, Claude Code hooks, your own pipeline) and your users *see* the team working instead of staring at a spinner.
 
@@ -10,6 +10,25 @@ Feed it events from any multi-agent system (LangGraph, CrewAI, AutoGen, the Open
 
 ![Coffee break at the Agentopolis Café](docs/coffee-break.png)
 
+## The cast
+
+Seven built-in characters, a film crew, each with its own look and ten animations: idle, walk, run, talk, wave, sit with a coffee, dance, cheer (and the critic nods and wags a finger).
+
+![The cast: director, narrator, designer, critic, composer, editor and scout](docs/characters/lineup.jpg)
+
+| `model` | Plays |
+|---|---|
+| `director` | The director: a red beret and scarf |
+| `narrator` | The voice: headphones and a bow tie |
+| `designer` | The art department: a paint-splattered apron |
+| `critic` | The critic: a waistcoat and a clipboard |
+| `composer` | The composer: a conductor's tailcoat |
+| `editor` | The editor: a cap and a gear backpack |
+| `explorer` | The scout: binoculars and a leather backpack |
+| `robot` | The little robot, tinted in the agent's colour (default) |
+
+Any rigged `.glb` URL works too. Name its clips `Idle`, `Walk`, `Run`, `Talk`, `Wave`, `SitDrink`, `Dance`, `Cheer`, `Agree` and `No` (or the robot's names); a missing clip falls back to a close one.
+
 ## Features
 
 - **Event-driven:** `say(agent, text)`, `done()` and `fail()`. It works with any framework, in any web page.
@@ -17,8 +36,8 @@ Feed it events from any multi-agent system (LangGraph, CrewAI, AutoGen, the Open
   - The speaker walks to the crossroads and the agent it answers joins it there.
   - Agents work at the door of their building while their last line is fresh.
   - A quiet agent picks a break spot, weighted: a café stool, the counter, a bench or a stroll. On breaks they make small talk.
-- **Real walking:** A* on an 8-direction navigation grid that skips furniture, string-pulled into straight lines, and robots that keep a little room between them.
-- **Gestures from the content:** a "6/10" makes the robot shake its head, an "8/10" gets a thumbs up, and music people dance.
+- **Real walking:** A* on an 8-direction navigation grid that skips furniture, string-pulled into straight lines, and agents that keep a little room between them. A speaker far from the crossroads runs there.
+- **Gestures from the content:** speakers talk with their hands, a "6/10" gets a finger wag, an "8/10" a nod or a thumbs up, and music people dance.
 - **A city of your own:**
   - one building per agent, with its sign in the agent's colour;
   - your title on the hill, Hollywood style;
@@ -28,7 +47,8 @@ Feed it events from any multi-agent system (LangGraph, CrewAI, AutoGen, the Open
 - **Light on the page:**
   - it pauses off-screen and in hidden tabs;
   - it respects `prefers-reduced-motion`;
-  - it shares models between robots;
+  - it loads only the models in use and shares them between agents;
+  - each character is about 1 MB (meshopt-compressed, WebP textures);
   - three.js is a peer dependency.
 - **Free art:** every model is CC0 (see [CREDITS.md](CREDITS.md)).
 
@@ -45,10 +65,10 @@ import { createAgentopolis } from '@kelvinbiffi/agentopolis'
 
 const city = createAgentopolis(document.getElementById('city')!, {
   agents: [
-    { id: 'planner',    name: 'Planner',    color: '#f59e0b', sign: 'PLANNING' },
-    { id: 'researcher', name: 'Researcher', color: '#0ea5e9', sign: 'LIBRARY' },
-    { id: 'coder',      name: 'Coder',      color: '#8b5cf6', sign: 'WORKSHOP' },
-    { id: 'reviewer',   name: 'Reviewer',   color: '#10b981', sign: 'REVIEW' },
+    { id: 'planner',    name: 'Planner',    color: '#f59e0b', sign: 'PLANNING', model: 'director' },
+    { id: 'researcher', name: 'Researcher', color: '#0ea5e9', sign: 'LIBRARY',  model: 'explorer' },
+    { id: 'coder',      name: 'Coder',      color: '#8b5cf6', sign: 'WORKSHOP', model: 'editor' },
+    { id: 'reviewer',   name: 'Reviewer',   color: '#10b981', sign: 'REVIEW',   model: 'critic' },
   ],
   title: 'MY AGENTS',
 })
@@ -83,8 +103,8 @@ function AgentCity({ events }: { events: { agent: string; text: string }[] }) {
 
 | Option | Default | |
 |---|---|---|
-| `agents` | — | `{ id, name?, color, sign? }[]`, in the order their buildings line up |
-| `assetsUrl` | jsDelivr copy of `assets/` | Where `robot.glb` and `city/*.gltf` are served from. Copy `node_modules/@kelvinbiffi/agentopolis/assets` to your public folder to self-host |
+| `agents` | — | `{ id, name?, color, sign?, model? }[]`, in the order their buildings line up. `model`: a built-in character, `"robot"` or a `.glb` URL |
+| `assetsUrl` | jsDelivr copy of `assets/` | Where `robot.glb`, `characters/*.glb` and `city/*.gltf` are served from. Copy `node_modules/@kelvinbiffi/agentopolis/assets` to your public folder to self-host |
 | `title` | `"AGENTOPOLIS"` | Letters on the hill |
 | `gate` | `"AGENTOPOLIS STUDIOS"` | The arch over the side street (`""` for none) |
 | `cafe` | `"AGENTOPOLIS CAFÉ"` | The café's sign |

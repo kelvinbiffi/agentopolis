@@ -11,13 +11,26 @@ import * as THREE from 'three'
 import { GLTFLoader, type GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils.js'
+import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js'
 import { buildWorld, CITY_MODELS, type CityModel, type Spot, type World } from './world'
-import type { Agentopolis, AgentopolisOptions, AgentDef, Line } from './types'
+import type { Agentopolis, AgentopolisOptions, AgentDef, Character, Line } from './types'
 
 const DEFAULT_ASSETS = 'https://cdn.jsdelivr.net/gh/kelvinbiffi/agentopolis@main/assets/'
+/** The built-in characters, served from `characters/<name>.glb`. */
+export const CHARACTERS: readonly Character[] = ['director', 'narrator', 'designer', 'critic', 'composer', 'editor', 'explorer']
 const ROBOT_HEIGHT = 0.82
+const PERSON_HEIGHT = 0.95
 const ONE_SHOT = ['Wave', 'Yes', 'No', 'ThumbsUp', 'Jump', 'Punch']
 const WALK_SPEED = 1.25
+const RUN_SPEED = 2.4
+const SEAT_HEIGHT = 0.25 // stools and benches; a character's sitting clip sits on the floor
+// A character's clips under the names the crew plays (the robot's names).
+const CLIP_NAMES: Record<string, string> = { Walk: 'Walking', Run: 'Running', SitDrink: 'Sitting', Cheer: 'ThumbsUp', Agree: 'Yes' }
+// What to play when a model lacks a clip.
+const FALLBACK: Record<string, string[]> = {
+  Talk: ['Yes', 'Idle'], Yes: ['Talk', 'Wave'], No: ['Talk', 'Idle'], ThumbsUp: ['Wave', 'Yes'], Dance: ['ThumbsUp', 'Wave'],
+  Running: ['Walking'], Sitting: ['Idle'], Wave: ['Yes', 'Idle'],
+}
 
 const CHATTER = {
   pt: ['☕ Mais um café?', 'Esse take vai ficar lindo.', 'Alguém viu o storyboard?', 'Pausa rápida, já volto.', 'O crítico tá exigente hoje…',
@@ -36,6 +49,8 @@ interface Actor {
   mixer: THREE.AnimationMixer
   actions: Record<string, THREE.AnimationAction>
   current: string
+  robot: boolean
+  height: number
   head: THREE.Object3D
   mode: Mode
   goal: { x: number; z: number } | null
@@ -51,8 +66,16 @@ interface Actor {
 
 const loaders = new Map<string, Promise<GLTF>>()
 function load(url: string) {
-  if (!loaders.has(url)) loaders.set(url, new GLTFLoader().loadAsync(url))
+  if (!loaders.has(url)) loaders.set(url, new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).loadAsync(url))
   return loaders.get(url)!
+}
+
+/** Where an agent's model is served from. */
+function modelUrl(def: AgentDef, base: string) {
+  const m = def.model ?? 'robot'
+  if (m === 'robot') return base + 'robot.glb'
+  if ((CHARACTERS as readonly string[]).includes(m)) return `${base}characters/${m}.glb`
+  return m
 }
 
 /** Mounts a city in the container and returns the handle that drives it. */
@@ -114,12 +137,20 @@ export function createAgentopolis(container: HTMLElement, options: AgentopolisOp
 
   // ── loading ────────────────────────────────────────────────────────────
   let world: World | null = null
-  let robot: GLTF | null = null
+  const cast = new Map<string, GLTF>()
   const actors = new Map<string, Actor>()
   let disposed = false
-  Promise.all([load(base + 'robot.glb'), ...CITY_MODELS.map(n => load(`${base}city/${n}.gltf`))]).then(([r, ...city]) => {
+  const castUrls = [...new Set(opts.agents.map(d => modelUrl(d, base)))]
+  Promise.all([
+    Promise.all(castUrls.map(u => load(u).catch(err => {
+      // a character that fails to load is played by the robot
+      console.warn('[agentopolis] could not load', u, err)
+      return load(base + 'robot.glb')
+    }))),
+    Promise.all(CITY_MODELS.map(n => load(`${base}city/${n}.gltf`))),
+  ]).then(([people, city]) => {
     if (disposed) return
-    robot = r
+    castUrls.forEach((u, i) => cast.set(u, people[i]))
     const models = Object.fromEntries(CITY_MODELS.map((n, i) => [n, city[i]])) as Record<CityModel, GLTF>
     world = buildWorld(scene, models, {
       agents: opts.agents,
@@ -134,11 +165,16 @@ export function createAgentopolis(container: HTMLElement, options: AgentopolisOp
   function spawn(def: AgentDef): Actor {
     const home = world!.homes.get(def.id)!
     const root = new THREE.Group()
-    const model = SkeletonUtils.clone(robot!.scene) as THREE.Group
+    const gltf = cast.get(modelUrl(def, base))!
+    const isRobot = gltf.animations.some(c => c.name === 'Walking') // the robot's clip names (a character has "Walk")
+    const height = isRobot ? ROBOT_HEIGHT : PERSON_HEIGHT
+    const model = SkeletonUtils.clone(gltf.scene) as THREE.Group
     model.updateMatrixWorld(true)
     const box = new THREE.Box3().setFromObject(model, true)
     const tall = box.max.y - box.min.y
-    model.scale.setScalar(ROBOT_HEIGHT / (tall > 0.01 && Number.isFinite(tall) ? tall : 4.4))
+    const k = height / (tall > 0.01 && Number.isFinite(tall) ? tall : 4.4)
+    model.scale.multiplyScalar(k)
+    if (Number.isFinite(box.min.y)) model.position.y -= box.min.y * k // feet on the street
     const tint = new THREE.Color(def.color)
     model.traverse(o => {
       const m = o as THREE.Mesh
@@ -146,7 +182,7 @@ export function createAgentopolis(container: HTMLElement, options: AgentopolisOp
       m.castShadow = true
       m.frustumCulled = false // skinned clones keep the bind pose's bounds
       const mat = m.material as THREE.MeshStandardMaterial
-      if (mat?.name === 'Main') {
+      if (isRobot && mat?.name === 'Main') {
         const mine = mat.clone()
         mine.color.copy(tint)
         mine.emissive = tint.clone().multiplyScalar(0.08)
@@ -159,13 +195,14 @@ export function createAgentopolis(container: HTMLElement, options: AgentopolisOp
 
     const mixer = new THREE.AnimationMixer(model)
     const actions: Record<string, THREE.AnimationAction> = {}
-    for (const clip of robot!.animations) {
+    for (const clip of gltf.animations) {
+      const name = isRobot ? clip.name : CLIP_NAMES[clip.name] ?? clip.name
       const a = mixer.clipAction(clip)
-      if (ONE_SHOT.includes(clip.name) || clip.name === 'Sitting') {
+      if (ONE_SHOT.includes(name) || (isRobot && name === 'Sitting')) {
         a.setLoop(THREE.LoopOnce, 1)
         a.clampWhenFinished = true
       }
-      actions[clip.name] = a
+      actions[name] = a
     }
     actions.Idle?.play()
     let head: THREE.Object3D = model
@@ -183,14 +220,15 @@ export function createAgentopolis(container: HTMLElement, options: AgentopolisOp
     overlay.append(bubble, tag)
 
     const a: Actor = {
-      def, root, mixer, actions, current: 'Idle', head, mode: 'work', goal: null, path: [], face: null, spot: null,
+      def, root, mixer, actions, current: 'Idle', robot: isRobot, height, head, mode: 'work', goal: null, path: [], face: null, spot: null,
       strollUntil: 0, nextGesture: 0, chatter: null, bubble, tag,
     }
     play(a, 'Wave')
     return a
   }
 
-  function play(a: Actor, name: string, fade = 0.25) {
+  function play(a: Actor, wanted: string, fade = 0.25) {
+    const name = a.actions[wanted] ? wanted : FALLBACK[wanted]?.find(n => a.actions[n]) ?? wanted
     if (a.current === name && !ONE_SHOT.includes(name)) return
     const next = a.actions[name], prev = a.actions[a.current]
     if (!next) return
@@ -210,8 +248,9 @@ export function createAgentopolis(container: HTMLElement, options: AgentopolisOp
 
   function gestureFor(a: Actor, text: string) {
     const score = text.match(/(\d+)\s*\/\s*10/)
-    if (score) return Number(score[1]) >= 7 ? 'ThumbsUp' : 'No'
-    if (/music|soundtrack|trilha|música/i.test(a.def.id + ' ' + (a.def.name ?? ''))) return 'Dance'
+    if (score) return Number(score[1]) >= 7 ? (a.robot || !a.actions.Yes ? 'ThumbsUp' : 'Yes') : 'No'
+    if (/music|soundtrack|trilha|música|compos/i.test(a.def.id + ' ' + (a.def.name ?? ''))) return 'Dance'
+    if (a.actions.Talk) return Math.random() < 0.2 ? 'Wave' : 'Talk'
     return Math.random() < 0.3 ? 'Wave' : 'Yes'
   }
 
@@ -307,7 +346,8 @@ export function createAgentopolis(container: HTMLElement, options: AgentopolisOp
       a.mode = mode
       if (mode === 'party') {
         const n = crew.length, ang = Math.PI * (0.15 + 0.7 * (n === 1 ? 0.5 : k / (n - 1)))
-        go(a, { x: world!.meet.x + Math.cos(ang) * -1.1, z: world!.meet.z - Math.sin(ang) * 0.2 + 0.25 })
+        const r = Math.max(1.1, n * 0.26) // room for everyone
+        go(a, { x: world!.meet.x + Math.cos(ang) * -r, z: world!.meet.z - Math.sin(ang) * 0.3 + 0.3 })
         a.face = null
       } else if (mode === 'meet') {
         const side = a.def.id === speaker ? 1 : -1
@@ -340,15 +380,18 @@ export function createAgentopolis(container: HTMLElement, options: AgentopolisOp
         const dist = Math.hypot(dx, dz)
         if (dist < 0.04) a.path.shift()
         else {
-          const stepLen = Math.min(dist, dt * (a.mode === 'party' ? 1.6 : WALK_SPEED))
+          // hurrying to the crossroads from far away: run
+          const left = a.path.reduce((s, p, i) => s + (i ? Math.hypot(p.x - a.path[i - 1].x, p.z - a.path[i - 1].z) : dist), 0)
+          const run = a.current === 'Running' ? left > 1.2 : a.mode === 'meet' && left > 4
+          const stepLen = Math.min(dist, dt * (run ? RUN_SPEED : a.mode === 'party' ? 1.6 : WALK_SPEED))
           a.root.position.x += (dx / dist) * stepLen
           a.root.position.z += (dz / dist) * stepLen
           a.root.rotation.y = lerpAngle(a.root.rotation.y, Math.atan2(dx, dz), dt * 10)
-          play(a, 'Walking')
+          play(a, run && a.actions.Running ? 'Running' : 'Walking')
         }
       } else {
         a.root.rotation.y = lerpAngle(a.root.rotation.y, a.face ?? 0, dt * 6)
-        if (a.current === 'Walking') play(a, 'Idle')
+        if (a.current === 'Walking' || a.current === 'Running') play(a, 'Idle')
         const spot = a.spot !== null ? world!.spots[a.spot] : null
         if (a.mode === 'party') {
           const lead = a.def.id === first
@@ -362,16 +405,19 @@ export function createAgentopolis(container: HTMLElement, options: AgentopolisOp
             a.nextGesture = t + 3.5 + Math.random() * 2
           }
           const g = a.actions[a.current]
-          if (g && g.loop === THREE.LoopOnce && !g.isRunning()) play(a, 'Idle')
+          if (g && g.loop === THREE.LoopOnce && !g.isRunning()) play(a, a.actions.Talk ? 'Talk' : 'Idle')
         } else if (a.mode === 'break' && spot?.sit) {
-          if (a.current !== 'Sitting') play(a, 'Sitting', 0.4)
-        } else if (a.current === 'Dance' || a.current === 'Sitting') {
+          if (a.current !== 'Sitting') play(a, 'Sitting', a.robot ? 0.4 : 0.6)
+        } else if (a.current === 'Dance' || a.current === 'Sitting' || a.current === 'Talk') {
           play(a, 'Idle')
         } else if (a.current !== 'Idle') {
           const g = a.actions[a.current]
           if (!g || g.loop !== THREE.LoopOnce || !g.isRunning()) play(a, 'Idle')
         }
       }
+      // a character climbs onto the seat as it sits down
+      const seated = !a.robot && a.current === 'Sitting' && !a.path.length
+      a.root.position.y += ((seated ? SEAT_HEIGHT : 0) - a.root.position.y) * Math.min(1, dt * 5)
       a.mixer.update(dt)
     }
 
@@ -405,7 +451,7 @@ export function createAgentopolis(container: HTMLElement, options: AgentopolisOp
       a.bubble.style.opacity = text ? (strong ? '1' : '0.6') : '0'
       a.bubble.classList.toggle('ap-small', !speaking && !(isLead && (wrap !== null || snag !== null)))
       a.head.getWorldPosition(tmp)
-      xs.set(a.def.id, place(a.bubble, tmp.setY(a.root.position.y + ROBOT_HEIGHT * 1.18), true))
+      xs.set(a.def.id, place(a.bubble, tmp.setY(a.root.position.y + a.height * 1.18), true))
       place(a.tag, tmp.set(a.root.position.x, -0.02, a.root.position.z + 0.12), false, true)
     }
     if (speaker && partner && Math.abs((xs.get(partner) ?? 0) - (xs.get(speaker) ?? 0)) < Math.min(280, w * 0.5))
@@ -454,7 +500,7 @@ export function createAgentopolis(container: HTMLElement, options: AgentopolisOp
         a.mixer.stopAllAction()
         a.root.traverse(o => {
           const m = o as THREE.Mesh
-          if (m.isMesh && (m.material as THREE.Material).name === 'Main') (m.material as THREE.Material).dispose()
+          if (a.robot && m.isMesh && (m.material as THREE.Material).name === 'Main') (m.material as THREE.Material).dispose()
         })
       }
       world?.dispose()
