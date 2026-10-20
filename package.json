@@ -47,6 +47,7 @@
     "build:demo": "vite build --config vite.demo.config.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "prepublishOnly": "npm run build && npm test",
     "predev": "node scripts/copy-assets.mjs",
     "prebuild:demo": "node scripts/copy-assets.mjs"
   },
