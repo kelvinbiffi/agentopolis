@@ -1,0 +1,63 @@
+{
+  "name": "@kelvinbiffi/agentopolis",
+  "version": "0.1.0",
+  "description": "A tiny 3D city where your AI agents live: they walk to meet, talk in speech bubbles, work in their departments and take coffee breaks. three.js, event-driven, framework-agnostic.",
+  "type": "module",
+  "license": "MIT",
+  "author": "Kelvin Biffi (https://github.com/kelvinbiffi)",
+  "homepage": "https://kelvinbiffi.github.io/agentopolis/",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kelvinbiffi/agentopolis.git"
+  },
+  "bugs": {
+    "url": "https://github.com/kelvinbiffi/agentopolis/issues"
+  },
+  "keywords": [
+    "ai-agents",
+    "multi-agent",
+    "visualization",
+    "threejs",
+    "3d",
+    "agents",
+    "llm",
+    "observability",
+    "speech-bubbles"
+  ],
+  "main": "./dist/agentopolis.js",
+  "module": "./dist/agentopolis.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/agentopolis.js"
+    }
+  },
+  "files": [
+    "dist",
+    "assets",
+    "LICENSE",
+    "CREDITS.md",
+    "README.md"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "dev": "vite --config vite.demo.config.ts",
+    "build": "vite build && tsc -p tsconfig.build.json",
+    "build:demo": "vite build --config vite.demo.config.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "predev": "node scripts/copy-assets.mjs",
+    "prebuild:demo": "node scripts/copy-assets.mjs"
+  },
+  "peerDependencies": {
+    "three": ">=0.155.0"
+  },
+  "devDependencies": {
+    "@types/three": "0.160.0",
+    "three": "0.160.1",
+    "typescript": "5.5.4",
+    "vite": "5.4.8",
+    "vitest": "2.1.2"
+  }
+}

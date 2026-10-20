@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Agentopolis · a tiny 3D city for your AI agents</title>
+  <meta name="description" content="Watch AI agents live in a 3D city: they walk to meet, talk in speech bubbles, work in their buildings and take coffee breaks. Open source, three.js, MIT." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800;900&display=swap" rel="stylesheet" />
+  <style>
+    :root { color-scheme: dark; --bg: #0f0d16; --fg: #f4f1fb; --muted: #a39cb8; --lime: #c6ff00; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.55 Inter, system-ui, sans-serif; }
+    main { max-width: 1100px; margin: 0 auto; padding: 28px 16px 56px; }
+    h1 { margin: 0; font-size: clamp(30px, 6vw, 52px); font-weight: 900; letter-spacing: -0.02em; }
+    h1 span { color: var(--lime); }
+    .lead { color: var(--muted); max-width: 680px; margin: 10px 0 20px; }
+    #city { height: min(62vh, 560px); min-height: 340px; border-radius: 18px; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,.45); }
+    .bar { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0 28px; }
+    button { border: 1px solid #3a3350; background: #1c1828; color: var(--fg); border-radius: 999px; padding: 8px 14px; font: 600 13px Inter, sans-serif; cursor: pointer; }
+    button:hover { border-color: var(--lime); }
+    button.primary { background: var(--lime); color: #14111c; border-color: var(--lime); }
+    pre { background: #17131f; border: 1px solid #2b2540; border-radius: 12px; padding: 14px; overflow: auto; font: 12.5px/1.55 ui-monospace, Menlo, Consolas, monospace; }
+    a { color: var(--lime); }
+    .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; color: var(--muted); font-size: 13px; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Agent<span>opolis</span></h1>
+    <p class="lead">A tiny 3D city where your AI agents live. The one speaking walks to the crossroads and the agent it answers meets it there; quiet agents go for a coffee. Feed it events from any multi-agent system.</p>
+    <div id="city"></div>
+    <div class="bar">
+      <button class="primary" id="run">▶ Play a run</button>
+      <button id="say">💬 Next line</button>
+      <button id="break">☕ Coffee break</button>
+      <button id="wrap">🎬 Wrap</button>
+      <button id="fail">⚠️ Fail</button>
+      <button id="theme">🌗 Theme</button>
+    </div>
+    <pre><code>import { createAgentopolis } from '@kelvinbiffi/agentopolis'
+
+const city = createAgentopolis(document.getElementById('city'), {
+  agents: [
+    { id: 'director', name: 'Director', color: '#f59e0b', sign: 'DIRECTOR' },
+    { id: 'designer', name: 'Designer', color: '#8b5cf6', sign: 'ART DEPT' },
+    { id: 'critic',   name: 'Critic',   color: '#10b981', sign: 'SCREENING' },
+  ],
+})
+
+city.say('designer', 'Scene 1 is ready.')
+city.say('critic', 'Scene 1: 6/10. More drama, please.')
+city.done()</code></pre>
+    <p class="row">
+      <span>Open source · MIT</span> ·
+      <a href="https://github.com/kelvinbiffi/agentopolis">GitHub</a> ·
+      <span>Made by <a href="https://github.com/kelvinbiffi">Kelvin Biffi</a> · used live in <a href="https://renderster.com">Renderster</a> Studio</span>
+    </p>
+  </main>
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>
